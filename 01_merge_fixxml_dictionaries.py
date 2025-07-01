@@ -81,6 +81,19 @@ def merge_fix_xml(default_xml_path, custom_xml_path, output_xml_path):
             if key and key not in existing_keys:
                 d_sec.append(element)
 
+        # For messages, we need to add more MsgType enum
+        if name == "messages":
+            msg_type_field = default_root.find(".//field[@number='35']")
+            for msg in c_sec:
+                enum = msg.get("msgtype")
+                description = msg.get("name").upper()
+
+                # Check if this value already exists
+                exists = msg_type_field.find(f"./value[@enum='{enum}']")
+                if exists is None:
+                    ET.SubElement(msg_type_field, "value",
+                                  enum=enum, description=description)
+
     merge_section("messages", "name")
     merge_section("components", "name")
 
