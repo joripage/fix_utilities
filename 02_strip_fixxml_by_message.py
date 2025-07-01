@@ -18,6 +18,7 @@ def strip_fix_xml(fix_xml_path, config_path, output_path):
     messages_to_keep = {(m) for m in config["messages_to_keep"]}
     used_field_names = set()
     used_components = set()
+    visited_components = set()
 
     # Load and parse FIX XML
     tree = ET.parse(fix_xml_path)
@@ -26,43 +27,44 @@ def strip_fix_xml(fix_xml_path, config_path, output_path):
     messages_el = root.find("messages")
     fields_el = root.find("fields")
     components_el = root.find("components")
+    header_el = root.find("header")
+    trailer_el = root.find("trailer")
 
-    # Filter <messages> and collect used fields/components
+    component_map = {
+        c.attrib["name"]: c for c in components_el} if components_el is not None else {}
+
+    def collect_nested_components(name):
+        if name in visited_components or name not in component_map:
+            return
+        visited_components.add(name)
+        used_components.add(name)
+        comp = component_map[name]
+        collect_fields_groups_components(comp)
+
+    def collect_fields_groups_components(elem):
+        for f in elem.findall("field"):
+            used_field_names.add(f.attrib["name"])
+        for g in elem.findall("group"):
+            used_field_names.add(g.attrib["name"])
+            collect_fields_groups_components(g)
+        for c in elem.findall("component"):
+            cname = c.attrib["name"]
+            collect_nested_components(cname)
+
+    # Collect from message
     for msg in list(messages_el):
         msgtype = msg.attrib.get("msgtype")
         if (msgtype) not in messages_to_keep:
             messages_el.remove(msg)
         else:
-            for field in msg.findall("field"):
-                used_field_names.add(field.attrib["name"])
-            for comp in msg.findall("component"):
-                used_components.add(comp.attrib["name"])
+            collect_fields_groups_components(msg)
 
-    # Recursively collect nested components
-    def collect_nested_components(comp_name):
-        if comp_name not in component_map or comp_name in visited_components:
-            return
-        visited_components.add(comp_name)
-        comp = component_map[comp_name]
-        for field in comp.findall("field"):
-            used_field_names.add(field.attrib["name"])
-        for subcomp in comp.findall("component"):
-            subname = subcomp.attrib["name"]
-            used_components.add(subname)
-            collect_nested_components(subname)
+    # Collect from header and trailer
+    for section in [header_el, trailer_el]:
+        if section is not None:
+            collect_fields_groups_components(section)
 
-    # Create map of all components
-    component_map = {}
-    visited_components = set()
-    if components_el is not None:
-        for comp in components_el.findall("component"):
-            name = comp.attrib["name"]
-            component_map[name] = comp
-
-        for comp in list(used_components):
-            collect_nested_components(comp)
-
-        # Remove unused components
+    if components_el:
         for comp in list(components_el):
             if comp.attrib["name"] not in used_components:
                 components_el.remove(comp)
