@@ -42,7 +42,7 @@ def merge_fix_xml(default_xml_path, custom_xml_path, output_xml_path):
     }
 
     for cf in custom_fields.findall("field"):
-        num = cf.attrib.get("number")
+        num = cf.attrib["number"]
         if num in default_field_map:
             df = default_field_map[num]
             if (
@@ -56,11 +56,6 @@ def merge_fix_xml(default_xml_path, custom_xml_path, output_xml_path):
             else:
                 print(
                     f"⚠️ TAG {num} exists in default FIX (same name & type).")
-
-    for cf in custom_fields.findall("field"):
-        num = cf.attrib["number"]
-        if num in default_field_map:
-            df = default_field_map[num]
             existing_enums = {v.attrib["enum"] for v in df.findall("value")}
             for val in cf.findall("value"):
                 if val.attrib["enum"] not in existing_enums:
@@ -68,7 +63,7 @@ def merge_fix_xml(default_xml_path, custom_xml_path, output_xml_path):
         else:
             default_fields.append(cf)
 
-    # Merge messages / components
+     # Merge messages / components
     def merge_section(name, key_attr):
         d_sec = default_root.find(name)
         c_sec = custom_root.find(name)
@@ -76,10 +71,24 @@ def merge_fix_xml(default_xml_path, custom_xml_path, output_xml_path):
             return
 
         existing_keys = {e.attrib.get(key_attr) for e in d_sec.findall("*")}
-        for element in c_sec.findall("*"):
-            key = element.attrib.get(key_attr)
-            if key and key not in existing_keys:
-                d_sec.append(element)
+        for c_element in c_sec.findall("*"):
+            key = c_element.attrib.get(key_attr)
+            if key and key not in existing_keys:  # if not exist, append all element
+                d_sec.append(c_element)
+            else:  # if exist, we merge fields and components
+                d_element = d_sec.find(f".//{d_sec[0].tag}[@name='{key}']")
+                d_field_map = {
+                    f.attrib["name"]: f for f in d_element.findall("field")
+                }
+                for cf in c_element.findall("field"):
+                    if cf not in d_field_map:
+                        d_element.append(cf)
+                d_component_map = {
+                    f.attrib["name"]: f for f in d_element.findall("component")
+                }
+                for cc in c_element.findall("component"):
+                    if cc not in d_component_map:
+                        d_element.append(cc)
 
         # For messages, we need to add more MsgType enum
         if name == "messages":

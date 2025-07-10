@@ -1,5 +1,7 @@
-msg_type,msg_name,tag_number,field_name,required,format,enum_values
-C01,CustomMessage01,20001,CustomField01,Y,STRING,Enum01:Enum 01|Enum02:Enum 02|Enum03:Enum 03
-C01,CustomMessage01,20002,CustomField02,N,STRING,Enum04:Enum 04|Enum05:Enum 05
-C01,CustomMessage01,55,Symbol,N,STRING,
-C02,CustomMessage02,20010,CustomField03,Y,INT,
+msg_type,msg_name,element_type,tag_number,element_name,required,data_type,enum_values
+C01,CustomMessage01,field,20001,CustomField01,Y,STRING,Enum01:Enum 01|Enum02:Enum 02|Enum03:Enum 03
+C01,CustomMessage01,field,20002,CustomField02,N,STRING,Enum04:Enum 04|Enum05:Enum 05
+C01,CustomMessage01,field,55,Symbol,N,STRING,
+C02,CustomMessage02,field,20010,CustomField03,Y,INT,
+D,NewOrderSingle,field,421,Country,Y,COUNTRY,
+D,NewOrderSingle,component,,NestedParties,Y,,

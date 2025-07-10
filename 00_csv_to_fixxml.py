@@ -42,31 +42,34 @@ def csv_to_fix_xml(csv_path: str, output_xml_path: str):
             msg_type = row["msg_type"].strip()
             msg_name = row["msg_name"].strip()
             tag_number = row["tag_number"].strip()
-            field_name = row["field_name"].strip()
+            element_name = row["element_name"].strip()
+            element_type = row["element_type"].strip()
             required = row["required"].strip().upper()
-            fmt = row["format"].strip().upper()
+            data_type = row["data_type"].strip().upper()
             enum_raw = row.get("enum_values", "").replace(" ", "").upper()
 
-            if tag_number in fields_map:
-                existing = fields_map[tag_number]
-                if existing["name"] != field_name or existing["type"] != fmt:
+            if element_name in fields_map:
+                existing = fields_map[element_name]
+                if existing["element_name"] != element_name or existing["data_type"] != data_type or existing["tag_number"] != tag_number:
                     errors.append(
                         f"⚠️ WARNING: Tag {tag_number} defined multiple times with different name/type:\n"
-                        f"  → First:  name={existing['name']}, type={existing['type']}\n"
-                        f"  → Now:    name={field_name}, type={fmt}"
+                        f"  → First:  element_name={existing['element_name']}, data_type={existing['data_type']}, tag_number={existing['tag_number']}\n"
+                        f"  → Now:    element_name={element_name}, data_type={data_type}, tag_number={tag_number}"
                     )
                     continue  # skip conflicting field
-                duplicates.add(tag_number)
+                duplicates.add(element_name)
             else:
-                fields_map[tag_number] = {
-                    "name": field_name,
-                    "type": fmt,
+                fields_map[element_name] = {
+                    "element_type": element_type,
+                    "tag_number": tag_number,
+                    "element_name": element_name,
+                    "data_type": data_type,
                     "enums": parse_enum_values(enum_raw, tag_number, errors)
                 }
 
             messages[(msg_type, msg_name)].append({
-                "tag": tag_number,
-                "name": field_name,
+                "element_type": element_type,
+                "element_name": element_name,
                 "required": required
             })
 
@@ -88,26 +91,32 @@ def csv_to_fix_xml(csv_path: str, output_xml_path: str):
         })
         seen_fields = set()
         for field in fields:
-            if field["tag"] in seen_fields:
+            if field["element_name"] in seen_fields:
                 continue  # avoid duplicate field in same message
-            seen_fields.add(field["tag"])
-            ET.SubElement(msg_el, "field", attrib={
-                "name": field["name"],
+            seen_fields.add(field["element_name"])
+            ET.SubElement(msg_el, field["element_type"], attrib={
+                "name": field["element_name"],
                 "required": field["required"]
             })
 
     # Fields
     fields_el = ET.SubElement(fix, "fields")
-    for tag_number, field in fields_map.items():
-        field_el = ET.SubElement(fields_el, "field", attrib={
-            "number": tag_number,
-            "name": field["name"],
-            "type": field["type"]
-        })
-        for enum_code, enum_desc in field["enums"]:
-            ET.SubElement(field_el, "value", attrib={
-                "enum": enum_code,
-                "description": enum_desc
+    for _, field in fields_map.items():
+        if field["element_type"] == "field":
+            field_el = ET.SubElement(fields_el, "field", attrib={
+                "number": field["tag_number"],
+                "name": field["element_name"],
+                "type": field["data_type"]
+            })
+            for enum_code, enum_desc in field["enums"]:
+                ET.SubElement(field_el, "value", attrib={
+                    "enum": enum_code,
+                    "description": enum_desc
+                })
+        elif field["element_type"] == "component":
+            field_el = ET.SubElement(fields_el, "component", attrib={
+                "name": field["element_name"],
+                "type": field["data_type"]
             })
 
     # Output XML
